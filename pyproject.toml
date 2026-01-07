@@ -22,9 +22,6 @@ dependencies = [
   "rapidfuzz>=3.0",
 ]
 
-[project.urls]
-Homepage = ""
-
 [tool.setuptools]
 package-dir = {"" = "src"}
 
