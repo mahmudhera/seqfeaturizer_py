@@ -1,8 +1,8 @@
 # seqfeaturizer (python-only)
 
-This is a clean, **python-only reimplementation** of the legacy `featurize_sequences` project you uploaded.
+This is a clean, **python-only reimplementation** of Jiayi's implementation of extracting features from many sequences.
 
-The original codebase produced several per-feature CSV files from a collection of DNA sequences:
+The original implementation produced several per-feature CSV files from a collection of DNA sequences:
 
 - `deepbind`
 - `5mer`
@@ -18,8 +18,8 @@ This reimplementation:
 - is packaged as a standard python project (installable with conda)
 - is modular and readable (each feature family lives in its own module)
 - provides **two main scripts**:
-  - `scripts/compute_features.py` → compute a consolidated feature table from sequences
-  - `scripts/compute_diff.py` → compute feature deltas between two consolidated tables
+  - `scripts/compute_features.py` compute a consolidated feature table from sequences
+  - `scripts/compute_diff.py` compute feature deltas between two consolidated tables
 
 ---
 
@@ -45,11 +45,11 @@ conda env create -f environment.min.yml
 conda activate seqfeaturizer
 ```
 
-> **Note:** `deepbind` is not installed by conda in this project. If you want DeepBind features, you must install a working DeepBind CLI separately and pass `--deepbind-cmd` + `--deepbind-ids`.
+> **Note:** `deepbind` is not installed by conda in this project. If we want DeepBind features, we must install a working DeepBind CLI separately and pass `--deepbind-cmd` + `--deepbind-ids`.
 
 ---
 
-## Inputs: how to prepare your data
+## Inputs: how to prepare our data
 
 ### 1) FASTA (recommended)
 
@@ -79,7 +79,7 @@ seq2,TTTTAAAA
 
 ### 3) BED + genome FASTA (optional)
 
-If you have genomic intervals, you can extract sequences directly:
+If we have genomic intervals, we can extract sequences directly:
 
 - BED columns: `chr start end [name]`
 - Requires `--genome-fasta path/to/genome.fa`
@@ -110,12 +110,12 @@ chr  pos  name  ref  alt
 - `GC`: count of `G` or `C`
 
 ### `fimo_summary` (optional; requires MEME-suite `fimo`)
-For each motif database you provide:
+For each motif database provided:
 
 - `<label>_motifs`: number of distinct motifs with p-value < threshold
 - `<label>_max_window`: max number of motif starts within any N-bp window (default 20)
 
-You provide motif databases via repeated `--motif-db LABEL=PATH` arguments.
+We need to provide motif databases via repeated `--motif-db LABEL=PATH` arguments.
 
 Optional expansions (can make the table very wide):
 
@@ -210,7 +210,7 @@ python scripts/compute_diff.py \
 
 ### B) Pairing file (ref|alt style)
 
-If your IDs differ between the two tables, provide a `pairs` file.
+If the IDs differ between the two tables, provide a `pairs` file.
 
 Example `pairs.tsv`:
 
@@ -299,9 +299,9 @@ If you need offline DNAshape features, skip them and/or provide a precomputed `d
 
 ## Citation
 
-If you publish work using DNA shape features or DeepBind outputs, please cite the original tools:
+Need to cite the original tools:
 
 - DNAshapeR / DNAshape method (Rohs Lab)
 - DeepBind
 - MEME-suite / FIMO
-
+- Jiayi's perturbation-MPRA predictor paper (the legacy code)
