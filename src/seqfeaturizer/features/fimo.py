@@ -87,7 +87,7 @@ def run_fimo(
         str(motif_file),
         str(fasta_path),
     ]
-    run_cmd(cmd, cwd=fimo_dir, check=True, capture=False)
+    run_cmd(cmd, cwd=None, check=True, capture=False)
 
     # FIMO outputs fimo.tsv in the output directory (newer versions). Some older versions use fimo.txt.
     tsv = fimo_dir / "fimo.tsv"
