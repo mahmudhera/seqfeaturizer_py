@@ -223,7 +223,7 @@ def sequences_from_vcf_like(
             raise ValueError(
                 f"REF allele mismatch for {rec.name}: expected '{ref}' at offset {pos0}, "
                 f"found '{rec.sequence[pos0:pos0+len(ref)]}'.\n"
-                "Check that your genome build matches the VCF-like coordinates."
+                "Check that the genome build matches the VCF-like coordinates."
             )
         seq_alt = rec.sequence[:pos0] + alt + rec.sequence[pos0 + len(ref) :]
         # Keep the same length if ref/alt length differs (indels): trim/pad with N

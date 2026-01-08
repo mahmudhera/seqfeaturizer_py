@@ -75,7 +75,7 @@ def featurize_dna_shape_rohs_server(
     Important
     ---------
     This feature requires internet access to RohsLab's DNAshape server.
-    If you need fully offline featurization, skip this feature or provide your
+    If we need fully offline featurization, we need to skip this feature or provide our
     own dna_shape.csv.
 
     Returns
