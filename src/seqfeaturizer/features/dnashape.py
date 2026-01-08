@@ -70,13 +70,12 @@ def featurize_dna_shape_rohs_server(
 ) -> pd.DataFrame:
     """Compute mean HelT/MGW/ProT/Roll using RohsLab's DNAshape webserver.
 
-    This reproduces the intent of the legacy pipeline's python implementation.
-
-    Important
-    ---------
-    This feature requires internet access to RohsLab's DNAshape server.
-    If we need fully offline featurization, we need to skip this feature or provide our
-    own dna_shape.csv.
+    This follows the legacy pipeline closely:
+      - write locs.fasta
+      - POST to .../serverBackend.php with fields seqfile + delimiter/entriesPerLine
+      - scrape Download.php?filename=/tmp/<id>.zip
+      - download + extract outputs
+      - compute mean across non-NA values for each sequence
 
     Returns
     -------
@@ -85,57 +84,92 @@ def featurize_dna_shape_rohs_server(
     out_dir = ensure_dir(out_dir)
     work = ensure_dir(out_dir / "dna_shape")
 
+    # 1) write FASTA
     fasta_path = work / "locs.fasta"
     with fasta_path.open("w") as f:
         for r in records:
             f.write(f">{r.name}\n{r.sequence}\n")
 
+    # 2) If outputs already exist (cache), skip server call
+    #    (mirrors legacy behavior: if all types exist, just parse)
+    def _has_outputs() -> bool:
+        files = list(work.rglob("*"))
+        for t in DNA_SHAPE_TYPES:
+            t_low = t.lower()
+            if not any(p.is_file() and p.name.lower().endswith("." + t_low) for p in files):
+                # allow token-in-name fallback too
+                if not any(p.is_file() and t_low in p.name.lower() for p in files):
+                    return False
+        return True
+
     session = requests.Session()
 
-    # The legacy code posts to this endpoint.
-    form_url = "https://rohslab.usc.edu/DNAshape/form_handler.php"
-    with fasta_path.open("rb") as fh:
-        resp = session.post(
-            form_url,
-            files={"seq_file": fh},
-            allow_redirects=True,
-            timeout=timeout_s,
-            verify=verify_ssl,
-        )
-    resp.raise_for_status()
+    if not _has_outputs():
+        # 3) POST to the legacy backend endpoint
+        rohs_bases = [
+            "https://rohslab.cmb.usc.edu/DNAshape/",
+            "https://rohslab.usc.edu/DNAshape/",
+        ]
 
-    # Find the generated zip download link in the HTML response.
-    m = re.search(r"(Download\.php\?filename=[^\"\s>]+\.zip)", resp.text)
-    if not m:
-        # Some server versions use a slightly different path or param.
-        m = re.search(r"(Download\.php\?filename=[^\"\s>]+)", resp.text)
-    if not m:
-        raise RuntimeError(
-            "Could not find DNAshape download URL in server response. "
-            "The DNAshape server output format may have changed."
-        )
+        last_err: Exception | None = None
+        html: str | None = None
+        rohs_base_used: str | None = None
 
-    download_rel = m.group(1)
-    download_url = "https://rohslab.usc.edu/DNAshape/" + download_rel
+        for base in rohs_bases:
+            try:
+                post_url = base + "serverBackend.php"
+                with fasta_path.open("rb") as fh:
+                    resp = session.post(
+                        post_url,
+                        data={
+                            "delimiter": "1",
+                            "entriesPerLine": "20",
+                            "submit_button": "Submit",
+                        },
+                        files={"seqfile": fh},  # legacy expects 'seqfile'
+                        allow_redirects=True,
+                        timeout=timeout_s,
+                        verify=verify_ssl,
+                    )
+                resp.raise_for_status()
+                html = resp.text
+                rohs_base_used = base
+                break
+            except Exception as e:
+                last_err = e
 
-    zip_resp = session.get(download_url, timeout=timeout_s, verify=verify_ssl)
-    zip_resp.raise_for_status()
+        if html is None or rohs_base_used is None:
+            raise RuntimeError(
+                "Failed to submit sequences to the DNAshape server at all known endpoints."
+            ) from last_err
 
-    zip_path = work / "dna_shape.zip"
-    zip_path.write_bytes(zip_resp.content)
+        # 4) Scrape the download link (legacy regex)
+        m = re.search(r"(Download\.php\?filename=/tmp/\w+\.zip)", html)
+        if not m:
+            raise RuntimeError(
+                "DNAshape server did not return a downloadable zip link. "
+                "Try manually uploading locs.fasta to the DNAshape web UI to confirm format."
+            )
 
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        zf.extractall(work)
+        download_url = rohs_base_used + m.group(1)
 
-    # Locate the shape files
+        # 5) Download zip + extract
+        zip_resp = session.get(download_url, timeout=timeout_s, verify=verify_ssl)
+        zip_resp.raise_for_status()
+
+        zip_path = work / "dna_shape.zip"
+        zip_path.write_bytes(zip_resp.content)
+
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extractall(work)
+
+    # 6) Locate shape files
     files = list(work.rglob("*"))
     type_to_file: Dict[str, Path] = {}
     for t in DNA_SHAPE_TYPES:
-        # match extension-like endings: .MGW, .ProT, .Roll, .HelT (case-insensitive)
         t_low = t.lower()
         cand = [p for p in files if p.is_file() and p.name.lower().endswith("." + t_low)]
         if not cand:
-            # Some versions might use .txt suffix with token in name
             cand = [p for p in files if p.is_file() and t_low in p.name.lower()]
         if cand:
             type_to_file[t] = sorted(cand)[0]
@@ -144,21 +178,20 @@ def featurize_dna_shape_rohs_server(
     if missing:
         raise RuntimeError(
             f"Missing DNA shape output files for: {missing}. "
-            "Inspect the extracted zip in dna_shape/ to see what the server returned."
+            "Inspect the extracted results in dna_shape/ to see what the server returned."
         )
 
-    # Parse and compute means
+    # 7) Parse and compute means (skip 'NA' as in legacy)
     means: Dict[str, Dict[str, float]] = {r.name: {} for r in records}
     for t in DNA_SHAPE_TYPES:
-        parsed = _parse_shape_fasta_like(type_to_file[t])
-        for name in means:
-            vals = parsed.get(name, [])
-            means[name][t] = float(pd.Series(vals).mean()) if vals else 0.0
+        parsed = _parse_shape_fasta_like(type_to_file[t])  # expected to drop 'NA'
+        for r in records:
+            vals = parsed.get(r.name, [])
+            means[r.name][t] = float(pd.Series(vals).mean()) if vals else 0.0
 
-    df = pd.DataFrame(
+    return pd.DataFrame(
         {
             "sequence_name": [r.name for r in records],
             **{t: [means[r.name][t] for r in records] for t in DNA_SHAPE_TYPES},
         }
     )
-    return df
