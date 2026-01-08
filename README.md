@@ -38,7 +38,7 @@ python -c "import seqfeaturizer; print(seqfeaturizer.__version__)"
 
 ### Option B: Minimal environment (no MEME-suite)
 
-Use this if you do **not** need FIMO-based features:
+Use this if we do **not** need FIMO-based features:
 
 ```bash
 conda env create -f environment.min.yml
@@ -135,7 +135,7 @@ Computes mean values of:
 - `--dnashape rohs`
 
 ### `deepbind` (optional)
-Wraps an external DeepBind CLI. You must provide:
+Wraps an external DeepBind CLI. We must provide:
 
 - `--deepbind-ids path/to/ids.txt`
 - (optionally) `--deepbind-cmd /path/to/deepbind`
@@ -293,7 +293,7 @@ conda install -c bioconda meme
 
 ### DNAshape server errors
 If RohsLab changes their webserver output format, the DNAshape download link regex may need adjustment.
-If you need offline DNAshape features, skip them and/or provide a precomputed `dna_shape.csv`.
+If we need offline DNAshape features, we need to skip them and/or provide a precomputed `dna_shape.csv`.
 
 ---
 
