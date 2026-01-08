@@ -119,6 +119,7 @@ def featurize_dna_shape_rohs_server(
             try:
                 post_url = base + "serverBackend.php"
                 with fasta_path.open("rb") as fh:
+                    print(f"Submitting sequences to DNAshape server at {post_url}...")
                     resp = session.post(
                         post_url,
                         data={
@@ -131,6 +132,7 @@ def featurize_dna_shape_rohs_server(
                         timeout=timeout_s,
                         verify=verify_ssl,
                     )
+                    print(f"Received response from DNAshape server at {post_url} with status code {resp.status_code}")
                 resp.raise_for_status()
                 html = resp.text
                 rohs_base_used = base
@@ -154,9 +156,11 @@ def featurize_dna_shape_rohs_server(
         download_url = rohs_base_used + m.group(1)
 
         # 5) Download zip + extract
+        print(f"Downloading DNAshape results from {download_url}...")
         zip_resp = session.get(download_url, timeout=timeout_s, verify=verify_ssl)
         zip_resp.raise_for_status()
 
+        print("Download complete, extracting...")
         zip_path = work / "dna_shape.zip"
         zip_path.write_bytes(zip_resp.content)
 
@@ -164,6 +168,7 @@ def featurize_dna_shape_rohs_server(
             zf.extractall(work)
 
     # 6) Locate shape files
+    print("Parsing DNAshape output files...")
     files = list(work.rglob("*"))
     type_to_file: Dict[str, Path] = {}
     for t in DNA_SHAPE_TYPES:
@@ -182,6 +187,7 @@ def featurize_dna_shape_rohs_server(
         )
 
     # 7) Parse and compute means (skip 'NA' as in legacy)
+    print("Computing mean DNA shape features...")
     means: Dict[str, Dict[str, float]] = {r.name: {} for r in records}
     for t in DNA_SHAPE_TYPES:
         parsed = _parse_shape_fasta_like(type_to_file[t])  # expected to drop 'NA'
