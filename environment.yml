@@ -11,7 +11,7 @@ dependencies:
   - tqdm
   - pyfaidx
   - rapidfuzz
-  # Optional but recommended if you want to compute FIMO-based features
+  # Optional but recommended if we want to compute FIMO-based features
   - meme
   - pip
   - pip:
